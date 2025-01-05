@@ -8,6 +8,7 @@ mod pinger;
 
 use std::net::IpAddr;
 
+use dns_lookup::lookup_host;
 // Public re-export of necessary elements
 pub use error::PingError;
 pub use stats::PingStats;
@@ -32,7 +33,16 @@ pub fn parse_args(args: &[String]) -> Result<IpAddr> {
                 IpAddr::V6(_) => Err(PingError::InvalidAddress("IPv6 isn't supported yet".to_string())),
             }
         }
-        Err(_) => Err(PingError::InvalidAddress("Invalid IP address".to_string())),
+        Err(_) => {
+            match lookup_host(&args[1]) {
+                Ok(ips) => {
+                    ips.into_iter()
+                        .find(|ip| ip.is_ipv4())
+                        .ok_or_else(|| PingError::InvalidAddress("No IPv4 address found".to_string()))
+                }
+                Err(_) => Err(PingError::InvalidAddress("Could not resolve hostname".to_string())),
+            }
+        }
     }
 }
 
@@ -134,9 +144,20 @@ mod tests {
         match parse_args(&args) {
             Ok(_) => panic!("Should have failed with invalid IP"),
             Err(e) => match e {
-                PingError::InvalidAddress(msg) => assert!(msg.contains("Invalid IP address")),
+                PingError::InvalidAddress(msg) => assert!(msg.contains("Could not resolve hostname")),
                 _ => panic!("Wrong error variant"),
             },
         }
+    }
+
+    #[test]
+    fn ttest_resolve_hostname() {
+        let args = vec![
+            String::from("program"),
+            String::from("localhost"),
+        ];
+        let result = crate::parse_args(&args);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), IpAddr::from([127, 0, 0, 1]));
     }
 }

@@ -9,6 +9,7 @@ pub enum PingError {
     PacketError(String),
     SocketNotInitialized,
     InvalidResponse,
+    SignalError(String),
 }
 
 impl fmt::Display for PingError {
@@ -20,6 +21,7 @@ impl fmt::Display for PingError {
             PingError::PacketError(e) => write!(f, "Packet error: {}", e),
             PingError::SocketNotInitialized => write!(f, "Socket not initialized"),
             PingError::InvalidResponse => write!(f, "Invalid response"),
+            PingError::SignalError(e) => write!(f, "Signal error: {}", e),
         }
     }
 }
@@ -29,5 +31,11 @@ impl std::error::Error for PingError {}
 impl From<io::Error> for PingError {
     fn from(error: io::Error) -> Self {
         PingError::SocketError(error)
+    }
+}
+
+impl From<ctrlc::Error> for PingError {
+    fn from(error: ctrlc::Error) -> Self {
+        PingError::SignalError(error.to_string())
     }
 }

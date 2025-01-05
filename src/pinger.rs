@@ -1,5 +1,7 @@
 use std::{net::IpAddr, time::Duration};
 use socket2::{Socket, Domain, Type, Protocol};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use crate::{PingConfig, PingError, PingStats};
 
@@ -9,6 +11,7 @@ pub struct Pinger {
     stats: PingStats,
     socket: Option<Socket>, // raw socket from socket2
     current_ping_start: Option<std::time::Instant>,
+    running: Arc<AtomicBool>,
 }
 
 impl Pinger {
@@ -19,6 +22,7 @@ impl Pinger {
             stats: PingStats::new(),
             socket: None,
             current_ping_start: None,
+            running: Arc::new(AtomicBool::new(true)),
         }
     }
 
@@ -55,14 +59,22 @@ impl Pinger {
     pub fn run(&mut self) -> Result<(), PingError> {
         self.init()?;
 
+        let running = self.running.clone();
+        ctrlc::set_handler(move || {
+            running.store(false, Ordering::SeqCst);
+        })?;
+
         let mut seq = 0;
-        while self.shoud_continue(seq) {
+        while self.shoud_continue(seq) && self.running.load(Ordering::SeqCst) {
             self.send_ping(seq)?;
             self.receive_pong()?;
             seq += 1;
             std::thread::sleep(self.config.interval());
         }
 
+        if !self.running.load(Ordering::SeqCst) {
+            println!("^C");
+        }
         self.print_statistics();
         Ok(())
     }
