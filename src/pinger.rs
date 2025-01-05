@@ -72,9 +72,6 @@ impl Pinger {
             std::thread::sleep(self.config.interval());
         }
 
-        if !self.running.load(Ordering::SeqCst) {
-            println!("^C");
-        }
         self.print_statistics();
         Ok(())
     }

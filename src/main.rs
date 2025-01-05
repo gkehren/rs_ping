@@ -1,16 +1,19 @@
 use std::env;
-use std::time::Duration;
 use rs_ping::{Pinger, PingError, parse_args};
 
 fn main() -> Result<(), PingError> {
     let args: Vec<String> = env::args().collect();
+    let opts = parse_args(&args)?;
 
-    let ip = parse_args(&args).map_err(|e| PingError::InvalidAddress(e.to_string()))?;
+    let mut pinger = Pinger::new(opts.target);
+    if let Some(count) = opts.count {
+        pinger = pinger.with_count(count);
+    }
+    if let Some(interval) = opts.interval {
+        pinger = pinger.with_interval(interval);
+    }
 
-    let mut pinger = Pinger::new(ip)
-    .with_count(4)
-    .with_interval(Duration::from_secs(1));
-    println!("PING {} ({}): {} data bytes", ip, ip, 56);
+    println!("PING {} ({}): {} data bytes", opts.target, opts.target, 56);
     pinger.run()?;
 
     Ok(())
